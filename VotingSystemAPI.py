@@ -88,8 +88,8 @@ class NewElectionModel(BaseModel):
 class DeleteElectionModel(BaseModel):
     votazione_id: int
 
-AUTH_BASE = "http://localhost:8001"
-VOTE_BASE = "http://localhost:8000"
+AUTH_BASE = "https://authority-k9w7.onrender.com"
+VOTE_BASE = "https://aggregator-ynd5.onrender.com"
 
 class VotingSystemAPI:
     """
@@ -135,7 +135,7 @@ class VotingSystemAPI:
 
     async def get_pk(self, votazione_id):
         try:
-            async with httpx.AsyncClient(base_url="http://localhost:8001/api/", timeout=30.0) as client:
+            async with httpx.AsyncClient(base_url="https://authority-k9w7.onrender.com/api/", timeout=30.0) as client:
 
                 resp = await client.post(f"elections", json={"votazione_id": f"{votazione_id}"})
                 return PublicKeyResponse(**resp.json())
@@ -146,7 +146,7 @@ class VotingSystemAPI:
 
     async def get_decrypt_tally(self, votazione_id, ciphertext):
         try:
-            async with httpx.AsyncClient(base_url="http://localhost:8001/api/", timeout=30.0) as client:
+            async with httpx.AsyncClient(base_url="https://authority-k9w7.onrender.com/api/", timeout=30.0) as client:
                 payload = DecryptTallyModel(
                     votazione_id=votazione_id,
                     ciphertext_sum=ciphertext
