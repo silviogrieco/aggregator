@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from phe import paillier, EncryptedNumber
 from typing import Dict
 
-from torch.onnx.symbolic_opset11 import insert
+
 
 from SupabaseConnection import supabase
 from UserFunctions import *
