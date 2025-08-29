@@ -106,22 +106,22 @@ class VotingSystemAPI:
         self.sim_store = SimulationStore("data/simulations/simulations.json")
 
         # endpoints per-elezione
-        self.router.post(f"{AUTH_BASE}elections/vote")(self.submit_vote)
-        self.router.post(f"{AUTH_BASE}elections/result")(self.get_result)
+        self.router.post(f"{VOTE_BASE}elections/vote")(self.submit_vote)
+        self.router.post(f"{VOTE_BASE}elections/result")(self.get_result)
 
-        self.router.get(f"{AUTH_BASE}elections/users")(self.list_non_admin_users)
-        self.router.post(f"{AUTH_BASE}elections/users/category")(self.update_user_category)
-        self.router.post(f"{AUTH_BASE}elections/users/delete_user")(self.delete_user)
+        self.router.get(f"{VOTE_BASE}elections/users")(self.list_non_admin_users)
+        self.router.post(f"{VOTE_BASE}elections/users/category")(self.update_user_category)
+        self.router.post(f"{VOTE_BASE}elections/users/delete_user")(self.delete_user)
 
-        self.router.post(f"{AUTH_BASE}categoria")(self.new_categoria)
-        self.router.get(f"{AUTH_BASE}categoria/list")(self.list_categorie)
-        self.router.post(f"{AUTH_BASE}elections/insert")(self.new_election)
-        self.router.post(f"{AUTH_BASE}elections/delete")(self.delete_election)
+        self.router.post(f"{VOTE_BASE}categoria")(self.new_categoria)
+        self.router.get(f"{VOTE_BASE}categoria/list")(self.list_categorie)
+        self.router.post(f"{VOTE_BASE}elections/insert")(self.new_election)
+        self.router.post(f"{VOTE_BASE}elections/delete")(self.delete_election)
 
-        self.router.get(f"{AUTH_BASE}elections/votazioni")(self.list_all_votes)
+        self.router.get(f"{VOTE_BASE}elections/votazioni")(self.list_all_votes)
 
-        self.router.post(f"{AUTH_BASE}simulation")(self.start_simulation)
-        self.router.post(f"{AUTH_BASE}simulation/end")(self.end_simulation)
+        self.router.post(f"{VOTE_BASE}simulation")(self.start_simulation)
+        self.router.post(f"{VOTE_BASE}simulation/end")(self.end_simulation)
 
 
     # ---------------------------------------------------------------------
@@ -135,7 +135,7 @@ class VotingSystemAPI:
 
     async def get_pk(self, votazione_id):
         try:
-            async with httpx.AsyncClient(base_url=VOTE_BASE, timeout=30.0) as client:
+            async with httpx.AsyncClient(base_url=AUTH_BASE, timeout=30.0) as client:
 
                 resp = await client.post(f"elections", json={"votazione_id": f"{votazione_id}"})
                 return PublicKeyResponse(**resp.json())
@@ -146,7 +146,7 @@ class VotingSystemAPI:
 
     async def get_decrypt_tally(self, votazione_id, ciphertext):
         try:
-            async with httpx.AsyncClient(base_url=VOTE_BASE, timeout=30.0) as client:
+            async with httpx.AsyncClient(base_url=AUTH_BASE, timeout=30.0) as client:
                 payload = DecryptTallyModel(
                     votazione_id=votazione_id,
                     ciphertext_sum=ciphertext
