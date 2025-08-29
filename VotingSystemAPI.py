@@ -101,27 +101,27 @@ class VotingSystemAPI:
     """
 
     def __init__(self):
-        self.router = APIRouter(prefix="/api/aggregator/")
+        self.router = APIRouter(prefix="/api/aggregator")
         self.acc = FileAccumulator("data/votazioni/votazioni.json")
         self.sim_store = SimulationStore("data/simulations/simulations.json")
 
         # endpoints per-elezione
-        self.router.post("elections/vote")(self.submit_vote)
-        self.router.post("elections/result")(self.get_result)
+        self.router.post("/elections/vote")(self.submit_vote)
+        self.router.post("/elections/result")(self.get_result)
 
-        self.router.get("elections/users")(self.list_non_admin_users)
-        self.router.post("elections/users/category")(self.update_user_category)
-        self.router.post("elections/users/delete_user")(self.delete_user)
+        self.router.get("/elections/users")(self.list_non_admin_users)
+        self.router.post("/elections/users/category")(self.update_user_category)
+        self.router.post("/elections/users/delete_user")(self.delete_user)
 
-        self.router.post("categoria")(self.new_categoria)
-        self.router.get("categoria/list")(self.list_categorie)
-        self.router.post("elections/insert")(self.new_election)
-        self.router.post("elections/delete")(self.delete_election)
+        self.router.post("/categoria")(self.new_categoria)
+        self.router.get("/categoria/list")(self.list_categorie)
+        self.router.post("/elections/insert")(self.new_election)
+        self.router.post("/elections/delete")(self.delete_election)
 
-        self.router.get("elections/votazioni")(self.list_all_votes)
+        self.router.get("/elections/votazioni")(self.list_all_votes)
 
-        self.router.post("simulation")(self.start_simulation)
-        self.router.post("simulation/end")(self.end_simulation)
+        self.router.post("/simulation")(self.start_simulation)
+        self.router.post("/simulation/end")(self.end_simulation)
 
 
     # ---------------------------------------------------------------------
