@@ -4609,3 +4609,7 @@ votazione_id
 2025-08-28 16:05:22,753 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/user_roles?select=user_id%2Crole "HTTP/2 200 OK"
 2025-08-28 16:05:22,815 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/votazioni?select=id%2Ctopic%2Ccategoria%2Cconcluded&order=id.asc "HTTP/2 200 OK"
 2025-08-28 16:05:22,881 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/categoria?select=nome "HTTP/2 200 OK"
+2025-08-28 16:57:03,263 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/profiles?select=id%2Cnome%2Ccognome%2Ccategoria "HTTP/2 200 OK"
+2025-08-28 16:57:03,327 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/user_roles?select=user_id%2Crole "HTTP/2 200 OK"
+2025-08-28 16:57:03,387 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/votazioni?select=id%2Ctopic%2Ccategoria%2Cconcluded&order=id.asc "HTTP/2 200 OK"
+2025-08-28 16:57:03,450 - HTTP Request: GET https://aogegjtluttpgbkqciod.supabase.co/rest/v1/categoria?select=nome "HTTP/2 200 OK"
