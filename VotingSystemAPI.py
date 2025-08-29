@@ -88,8 +88,8 @@ class NewElectionModel(BaseModel):
 class DeleteElectionModel(BaseModel):
     votazione_id: int
 
-AUTH_BASE = "https://authority-k9w7.onrender.com/api/aggregator/"
-VOTE_BASE = "https://aggregator-ynd5.onrender.com/api/authority/"
+AUTH_BASE = "https://authority-k9w7.onrender.com/api/authority/"
+VOTE_BASE = "https://aggregator-ynd5.onrender.com/api/aggregator/"
 
 class VotingSystemAPI:
     """
