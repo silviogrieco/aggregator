@@ -1,4 +1,5 @@
 # VotingSystemAPI.py
+import time
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -532,3 +533,4 @@ class VotingSystemAPI:
         except Exception as e:
             logging.info(f"Errore selezione categorie: {e}")
             raise HTTPException(status_code=500, detail=f"Errore selezione categorie: {e}")
+

@@ -174,7 +174,7 @@ def get_election(votazione_id: int):
 def delete_election(votazione_id: int):
     try:
         supabase.table("votes").delete().eq("votazione_id", votazione_id).execute()
-        supabase.table("votazioni").delete().eq("id", votazione_id).execute()
+        #supabase.table("votazioni").delete().eq("id", votazione_id).execute()
     except Exception as e:
         raise RuntimeError(f"Impossibile cancellare la votazione: {e}")
 
