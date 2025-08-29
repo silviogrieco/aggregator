@@ -101,7 +101,7 @@ class VotingSystemAPI:
     """
 
     def __init__(self):
-        self.router = APIRouter(prefix="/api/aggregator")
+        self.router = APIRouter(prefix="/api/aggregator/")
         self.acc = FileAccumulator("data/votazioni/votazioni.json")
         self.sim_store = SimulationStore("data/simulations/simulations.json")
 
