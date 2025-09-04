@@ -1,15 +1,7 @@
-# VotingSystemAPI.py
-import time
-
 import httpx
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-from phe import paillier, EncryptedNumber
-from typing import Dict
+from fastapi import APIRouter, HTTPException
 
-
-
-from SupabaseConnection import supabase
+from phe import paillier
 from UserFunctions import *
 import logging
 
@@ -93,13 +85,7 @@ AUTH_BASE = "https://authority-k9w7.onrender.com/api/authority/"
 VOTE_BASE = "https://aggregator-ynd5.onrender.com/api/aggregator/"
 
 class VotingSystemAPI:
-    """
-    API per votazioni con chiavi Paillier per-ELEZIONE.
-    - POST   /elections/{election_id}             -> crea (idempotente) la coppia di chiavi
-    - GET    /elections/{election_id}/public_key  -> restituisce la PK
-    - POST   /elections/{election_id}/vote        -> accetta un ciphertext Paillier
-    - GET    /elections/{election_id}/result      -> ritorna tally (in chiaro) della somma
-    """
+
 
     def __init__(self):
         self.router = APIRouter(prefix="/api/aggregator")
@@ -135,6 +121,12 @@ class VotingSystemAPI:
     # ---------------------------------------------------------------------
 
     async def get_pk(self, votazione_id):
+
+        """
+        Crea/Restituisce la chiave pubblica per la specifica votazione mediante richiesta al server Authority
+        :param votazione_id:
+        :return public_key:
+        """
         try:
             async with httpx.AsyncClient(base_url=AUTH_BASE, timeout=30.0) as client:
 
@@ -146,6 +138,12 @@ class VotingSystemAPI:
             raise HTTPException(status_code=404, detail="Elezione non trovata o non inizializzata: " + str(e))
 
     async def get_decrypt_tally(self, votazione_id, ciphertext):
+        """
+        Restituisce la somma dei voti decriptata mediante richiesta al server Authority
+        :param votazione_id:
+        :param ciphertext:
+        :return decrypt_tally:
+        """
         try:
             async with httpx.AsyncClient(base_url=AUTH_BASE, timeout=30.0) as client:
                 payload = DecryptTallyModel(
@@ -161,40 +159,40 @@ class VotingSystemAPI:
             raise HTTPException(status_code=404, detail="Decifratura non riuscita: " + str(e))
 
     async def new_categoria(self, payload: NewCategoriaModel):
+        """
+        Crea una nuova categoria
+        :param payload:
+        :return void:
+        """
         nome = payload.nome
         try:
             create_categoria(nome)
         except Exception as e:
             raise HTTPException(status_code=500, detail="Categoria non creata: "+ str(e))
 
-    async def submit_vote(self, request: Request):
+    async def submit_vote(self, body: SubmitVoteBody):
         """
-        Riceve un ciphertext come stringa/int.
-        Opzionale: verifica del fingerprint PK per evitare mix di chiavi.
-        Aggrega omomorficamente moltiplicando i ciphertext (Paillier).
+        Riceve un ciphertext come stringa.
+        Aggrega omomorficamente sommando i ciphertext.
+        :param body:
+        :return status:
         """
         try:
-            body_json = await request.json()
-            body = SubmitVoteBody(**body_json)
-            logging.info(body)
+            votazione_id = str(body.votazione_id)
+            c_int = int(body.ciphertext)
         except Exception as e:
             logging.info("Exception: Payload non valido" + str(e))
             raise HTTPException(status_code=400, detail=f"Payload non valido: {e}")
 
-        # carica PK per questa elezione
-        votazione_id = str(body.votazione_id)
+        #carico la chiave pubblica per la votazione con id votazione_id
+
         pk_model = await self.get_pk(votazione_id)
         pk = paillier.PaillierPublicKey(n=int(pk_model.n))
-        # ricostruisci l'EncryptedNumber
-        try:
-            c_int = int(body.ciphertext)
-        except Exception:
-            logging.info("Exception: ciphertext deve essere un intero decimale")
-            raise HTTPException(status_code=400, detail="ciphertext deve essere un intero decimale")
 
+        # ricostruisco l'EncryptedNumber
         enc_vote = paillier.EncryptedNumber(pk, c_int, 0)
 
-        # aggregazione: prodotto dei ciphertext (somma dei plaintext)
+        # aggregazione: somma dei ciphertext
         current = self.acc.get(votazione_id)
         if current is None:
             # primo voto: salva direttamente
@@ -215,46 +213,47 @@ class VotingSystemAPI:
     # ---------------------------------------------------------------------
     # TALLY
     # ---------------------------------------------------------------------
-    async def get_result(self, request: Request):
+    async def get_result(self, body: ResultModel):
         """
-        Decripta la somma per l'elezione. Se non sono arrivati voti -> 404.
-        Ritorna solo il totale Sì (somma dei plaintext 0/1) e il totale voti ricevuti.
-        Il NO = totale - SI.
+        Carica sul database la somma in chiaro dei voti mediante richiesta al server Authority
+        :param body:
+        :return status:
         """
 
         try:
-            body_json = await request.json()
-            body = ResultModel(**body_json)
+            votazione_id = str(body.votazione_id)
+            num_utenti_int = int(body.num_utenti)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Payload non valido: {e}")
 
-        votazione_id = str(body.votazione_id)
-        logging.info(f"[get_result] id={votazione_id}")
+
         resp = get_election(int(votazione_id))
         row = resp.data
         if row is None:
             raise HTTPException(status_code=404, detail="Votazione non trovata")
         conclusa = bool(row[0].get("concluded"))
-
-
-        logging.info(f"conclusa = {conclusa}")
+        si = str(row[0].get("si"))
+        no = str(row[0].get("no"))
 
         if conclusa:
-            logging.info("Votazione conclusa, esco dalla funzione")
-            return {"status": "ok"}
+            return {
+                "status": "ok",
+                    "si": si,
+                    "no": no
+                }
 
 
-        logging.info("Entered get_result")
         current = self.acc.get(votazione_id)
         if current is None:
             raise HTTPException(404, "Nessun voto per questa elezione")
 
         acc_c, acc_exp, acc_count = current
-        num_utenti_int = int(body.num_utenti)
+
 
         if num_utenti_int <= acc_count:
             acc_c, acc_exp, count = current
 
+            #richiesta di decifratura al server Authority
             tally_model = await self.get_decrypt_tally(votazione_id, acc_c)
 
             yes_total = tally_model.plain_sum
@@ -265,12 +264,15 @@ class VotingSystemAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Update non riuscito: {e}")
 
-            #Elimino i dati dell'accumulatore relativi alla votazione conclusa
+            #elimino i dati dell'accumulatore relativi alla votazione conclusa
             self.acc.clear(votazione_id)
-            return {"status": "ok"}
+            return {
+                "status": "ok",
+                    "si": str(yes_total),
+                    "no": str(no_total)
+                }
 
         else:
-            logging.info("Votazione non conclusa")
             return{"status": "Votazione non conclusa"}
 
 
@@ -281,6 +283,10 @@ class VotingSystemAPI:
 
 
     async def list_non_admin_users(self):
+        """
+        Restituisce la lista di utenti non admin
+        :return user_model:
+        """
         status, users = get_all_users()
         if not status or status.get("status") != "ok":
             msg = status.get("message", "Errore nel recupero utenti") if isinstance(status, dict) else "Errore nel recupero utenti"
@@ -300,9 +306,19 @@ class VotingSystemAPI:
         return user_model
 
 
-    async def update_user_category(self, payload: UserCategoryUpdate):
+    async def update_user_category(self, body: UserCategoryUpdate):
+        """
+        Aggiorna la categoria di uno specifico utente
+        :param body:
+        :return status:
+        """
+        try:
+            user_id = body.user_id
+            categoria = body.categoria
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Payload non valido: {e}")
 
-        res = change_categoria(payload.user_id, payload.categoria)
+        res = change_categoria(user_id, categoria)
         if not res or res.get("status") != "ok":
             msg = res.get("message", "Impossibile aggiornare la categoria") if isinstance(res, dict) else "Impossibile aggiornare la categoria"
             raise HTTPException(status_code=400, detail=msg)
@@ -310,9 +326,18 @@ class VotingSystemAPI:
 
 
 
-    async def delete_user(self, request: Request):
-        resp = await request.json()
-        user_id = DeleteUserModel(**resp).user_id
+    async def delete_user(self, body: DeleteUserModel):
+
+        """
+        Elimina un utente dal database
+        :param body:
+        :return status:
+        """
+        try:
+            user_id = body.user_id
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Payload non valido: {e}")
+
         res = delete_user(user_id)
         status = res.get("status")
         if not res or status != "ok":
@@ -326,7 +351,7 @@ class VotingSystemAPI:
     async def list_all_votes(self):
         """
         Restituisce la lista di tutte le votazioni effettuate
-        :return:
+        :return [VoteModel]:
         """
         try:
              return list_elections()
@@ -341,23 +366,27 @@ class VotingSystemAPI:
         Crea una simulazione di 10+ votazioni efffettuate da utenti fittizzi creati a run-time
 
         Flusso:
-          1) Crea 'count' utenti fittizi (auth + profiles ), tutti con stessa categoria condivisa.
-          2) Crea la votazione (tabella 'votazioni') -> prendi id come election_id.
-          3) POST /api/elections/{election_id} (crea chiavi).
-          4) GET  /api/elections/{election_id}/public_key -> Paillier PK.
-          5) Per ogni utente: genera voto 0/1, cifra e POST /api/elections/vote {election_id, ciphertext, topic, num_utenti}.
-          6) POST /api/elections/{election_id}/result {num_utenti} -> decritta e scrive si/no/concluded in DB.
-          7) Leggi i risultati da 'votazioni' e ritorna tutto.
+          1) Crea la votazione (tabella 'votazioni') -> prendi id come votazione_id.
+          2) Crea 'count' utenti fittizi con la stessa categoria condivisa.
+          3) Richiesta al server Authority per la chiave pubblica.
+          4) Per ogni utente: genera voto 0/1, cifra e POST /api/elections/vote {election_id, ciphertext, topic, num_utenti}.
+          5) POST /api/elections/result {voatzione_id, num_utenti} -> decritta e scrive si/no/concluded in DB.
+          6) Leggi i risultati da 'votazioni' e ritorna tutto.
+        :param body:
+        :return SimulationResponse{}:
         """
-        if body.count <= 10 or body.count > 30:
-            raise HTTPException(status_code=400, detail="count deve essere tra 10 e 30")
 
         simulation_id = self.sim_store.next_id()
-        categoria = body.categoria
-        topic = body.topic or f"Simulazione {simulation_id}"
+        try:
+            count = body.count
+            topic = body.topic or f"Simulazione {simulation_id}"
+            categoria = body.categoria
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Payload non valido: {e}")
 
+        if count < 10 or count > 30:
+            raise HTTPException(status_code=400, detail="count deve essere tra 10 e 30")
 
-        logging.info(f"SimulationID: {simulation_id}, categoria: {categoria}, topic: {topic}")
         try:
             # 1) crea votazione per categoria
             v_res = insert_election(topic, categoria)
@@ -366,11 +395,6 @@ class VotingSystemAPI:
 
             if not v_res or votazione_id is None:
                 raise RuntimeError("Creazione votazione fallita")
-            else:
-                logging.info(f"Votazione creata con id: {votazione_id}")
-
-            # election_id = id DB
-
 
             payload = {
                 "votazione_id": votazione_id,
@@ -407,7 +431,7 @@ class VotingSystemAPI:
                 payload["user_ids"] = user_ids
                 self.sim_store.set(simulation_id, payload)
 
-
+            #3)richiesta della chiave pubblica
             async with httpx.AsyncClient(base_url=AUTH_BASE, timeout=30.0) as auth:
 
                 r_create = await auth.post(f"elections", json={"votazione_id": f"{votazione_id}"})
@@ -418,6 +442,7 @@ class VotingSystemAPI:
                 pub_key = paillier.PaillierPublicKey(n=int(pk_body.n))
 
 
+            #4)Voto casuale 0/1 per ogni utente generato
             async with httpx.AsyncClient(base_url=VOTE_BASE, timeout=30.0) as vote_cli:
                 total = body.count
                 for _uid in user_ids:
@@ -432,6 +457,7 @@ class VotingSystemAPI:
                     if r_sub.status_code != 200:
                         raise RuntimeError(f"Errore submit_vote: {r_sub.text}")
 
+                #5)Ritorna i risultati con richiesta all'endpoint /result
                 r_res = await vote_cli.post(
                     f"elections/result",
                     json={"votazione_id": votazione_id, "num_utenti": total},
@@ -447,9 +473,8 @@ class VotingSystemAPI:
                 .single()
                 .execute()
             ).data or {}
-            concluded = row.get("concluded")
 
-            logging.info(f"Votazione {votazione_id}: {concluded}")
+            #6)Caricati i risultati salvati nel db dall'endpoint /result
             result = {
                 "Totale SI": int(row.get("si", 0)),
                 "Totale NO": int(row.get("no", 0)),
@@ -458,7 +483,6 @@ class VotingSystemAPI:
 
             # traccia per cleanup
 
-
             return SimulationResponse(
                 simulation_id=simulation_id,
                 categoria=categoria,
@@ -466,7 +490,7 @@ class VotingSystemAPI:
                 generated_users=generated_users,
                 result=result,
             )
-
+        #rollback in caso di errore
         except Exception as e:
             logging.info("Entered failure DELETE section cause: %s", e)
             # rollback best-effort (utenti e votazione)
@@ -490,9 +514,10 @@ class VotingSystemAPI:
 
     async def end_simulation(self, payload: SimulationEndModel):
         """
-        Chiude la simulazione eliminando gli UTENTI di test
-
-         L’aggregatore viene pulito quando /result marca la votazione come conclusa
+        Chiude la simulazione eliminando gli UTENTI di test e la votazione effettuata
+        L’aggregatore viene pulito quando /result marca la votazione come conclusa
+        :param payload:
+        :return void:
         """
         simulation_id = payload.simulation_id
         sim = self.sim_store.get(simulation_id)
@@ -505,22 +530,29 @@ class VotingSystemAPI:
             delete_election(sim.get("votazione_id"))
             if user_ids:
                 for uid in user_ids:
-                    try:
                         delete_auth_user(uid)
-                    except Exception:
-                        pass
 
             self.sim_store.pop(simulation_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Errore durante la chiusura della simulazione: {e}")
 
     async def new_election(self, payload: NewElectionModel):
+        """
+        Crea una nuova votazione
+        :param payload:
+        :return votazione_id:
+        """
         try:
             return insert_election(payload.topic, payload.categoria)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Errore inserimento votazione: {e}")
 
     async def delete_election(self, payload: DeleteElectionModel):
+        """
+        Elimina una specifica votazione
+        :param payload:
+        :return voidd:
+        """
         try:
             delete_election(payload.votazione_id)
         except Exception as e:
@@ -528,6 +560,10 @@ class VotingSystemAPI:
             raise HTTPException(status_code=500, detail=f"Impossibile eliminare la categoria: {e}")
 
     async def list_categorie(self):
+        """
+        Resituisce la lista aggiornata delle categorie
+        :return [str]:
+        """
         try:
            return get_categorie()
         except Exception as e:

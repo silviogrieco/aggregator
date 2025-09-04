@@ -1,0 +1,25 @@
+# Python cache & build
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+
+#Ambiente virtuale
+.venv
+
+#IDE
+.idea
+
+#Chiavi API
+.env
+
+data
+
+
